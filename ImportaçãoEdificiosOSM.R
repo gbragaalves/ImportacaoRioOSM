@@ -5,15 +5,15 @@
 library(sf)
 library(dplyr)
 
-## Define pasta onde está o arquivo previamente recortado no QGIS.
+## Define pasta onde esta o arquivo previamente recortado no QGIS.
 
-setwd("D:/Edificacoes_2013/recortado")
+setwd("D:/Edificacoes_2013/Tutorial")
 
 ## Define nome do arquivo que sera carregado.
 
-nome_camada <- "ed_Botafogo6"
+nome_arq <- "ed_selecionado_bruto"
 
-Edific <- st_read(paste0("./",nome_camada,".shp"), stringsAsFactors = F)
+Edific <- st_read(paste0("./",nome_arq,".gpkg"), stringsAsFactors = F)
 
 ## Remove dimensao Z, mantendo arquivo de duas dimensoes (X,Y).
 
@@ -107,6 +107,10 @@ Edific$building <- "yes"
 
 Edific$`building:part` <- NULL
 
+## Cria variavel altura, pois ha diferencas considerando altura e elevacao.
+
+Edific$altura <- Edific$ele + Edific$height
+
 ## Se altura do contido for maior que altura do contem, e layer do contido
 ## for menor ou igual a layer do contem, layer do contido recebe layer 
 ## do contem mais um.
@@ -121,7 +125,7 @@ for (j in 1:10){
   for (i in 1:nrow(c)){
     f <- c$Contido[i]
     g <- c$Contem[i]
-    if (Edific$height[Edific$id==f]>Edific$height[Edific$id ==g]){
+    if (Edific$altura[Edific$id==f]>Edific$altura[Edific$id ==g]){
       if (Edific$layer[Edific$id==f]<=Edific$layer[Edific$id==g]){
         Edific$layer[Edific$id==f] <- Edific$layer[Edific$id==g]+1
         Edific$`building:part`[Edific$id==f] <- "yes"
@@ -130,7 +134,7 @@ for (j in 1:10){
   }
 }  
 
-## Se buiding:part = sim, building = não.
+## Se buiding:part = sim, building = n?o.
 ## Se layer = 0, remover layer.
 
 Edific <- Edific %>% 
@@ -142,14 +146,21 @@ Edific <- Edific %>%
 ## Transforma layer em numero inteiro.
 
 Edific$layer <- as.integer(Edific$layer)
+Edific$source <- "data.rio"
 
 ## Seleciona colunas utilizadas no OSM.
 
 Edific <- subset(Edific, select=c(height,ele,layer,`IPP:CodEdificio`,
-                                  building,`building:part`))
+                                  building,`building:part`, source))
+
+Edific <- st_simplify(Edific, preserveTopology = TRUE, 
+                      dTolerance = 0.1)
+
+Edific <- Edific %>% 
+  filter(height>2.5)
 
 ## Salva como geojson. Se salvar como shp perde o nome das colunas, que tem 
 ## limite de caracteres.
 
-st_write(Edific, paste0("./",nome_camada,"_proc.geojson"), append = F)
+st_write(Edific, paste0("./ed_selecionado_proc.geojson"), append = F)
 
